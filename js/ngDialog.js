@@ -87,7 +87,7 @@
             openOnePerName = isOpenOne || false;
         };
 
-        var globalID = 0, dialogsCount = 0, closeByDocumentHandler, defers = {};
+        var globalID = 0, dialogsCount = 0, closeByDocumentHandler, defers = {}, defersEnd = {};
 
         this.$get = ['$document', '$templateCache', '$compile', '$q', '$http', '$rootScope', '$timeout', '$window', '$controller', '$injector',
             function ($document, $templateCache, $compile, $q, $http, $rootScope, $timeout, $window, $controller, $injector) {
@@ -210,6 +210,7 @@
 
                     closeDialogElement: function($dialog, value) {
                         var options = $dialog.data('$ngDialogOptions');
+                        var id = $dialog.attr('id');
                         $dialog.remove();
 
                         activeBodyClasses.splice(activeBodyClasses.indexOf(options.bodyClassName), 1);
@@ -220,6 +221,16 @@
 
                         if (dialogsCount === 0) {
                             privateMethods.resetBodyPadding();
+                        }
+
+                        if (defersEnd[id]) {
+                            defersEnd[id].resolve({
+                                id: id,
+                                value: value,
+                                $dialog: $dialog,
+                                remainingDialogs: dialogsCount
+                            });
+                            delete defersEnd[id];
                         }
 
                         $rootScope.$broadcast('ngDialog.closed', $dialog, value);
@@ -522,7 +533,9 @@
                         angular.extend(options, opts);
 
                         var defer;
+                        var deferEnd;
                         defers[dialogID] = defer = $q.defer();
+                        defersEnd[dialogID] = deferEnd = $q.defer();
 
                         var scope;
                         scopes[dialogID] = scope = angular.isObject(options.scope) ? options.scope.$new() : $rootScope.$new();
@@ -733,6 +746,7 @@
                         return {
                             id: dialogID,
                             closePromise: defer.promise,
+                            closedPromise: deferEnd.promise,
                             close: function (value) {
                                 privateMethods.closeDialog($dialog, value);
                             }
